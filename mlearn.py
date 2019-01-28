@@ -211,7 +211,7 @@ def loss_squared(fx,y):
 
 def loss_exp_sigm(fx,y):
     A = 1.
-    B = 5.
+    B = 1.
     n = len(fx)
     l = numpy.zeros((n,1))
     dldf = numpy.zeros((n,1))
