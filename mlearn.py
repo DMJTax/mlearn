@@ -1,7 +1,6 @@
 import numpy
 import matplotlib.pyplot as plt
 import copy  # tsk tsk, this python
-import sys
 
 # === ML model =============================================
 
@@ -54,6 +53,22 @@ class mlmodel(object):
         err = abs(grad - approx)
 
         return (err.max()<1e-8)
+
+    def plot(self,levels=[0.0],colors=None,gridsize = 30):
+        ax = plt.gca()
+        xl = ax.get_xlim()
+        yl = ax.get_ylim()
+        dx = (xl[1]-xl[0])/(gridsize-1)
+        dy = (yl[1]-yl[0])/(gridsize-1)
+        x = numpy.arange(xl[0],xl[1]+0.01*dx,dx)
+        y = numpy.arange(yl[0],yl[1]+0.01*dy,dy)
+        z = numpy.zeros((gridsize,gridsize))
+        for i in range(0,gridsize):
+            for j in range(0,gridsize):
+                # have I already told you that I hate python?
+                featvec = numpy.array([x[i],y[j]],ndmin=2)
+                z[j,i] = self(featvec)[0]
+        plt.contour(x,y,z,levels,colors=colors)
 
 # === decomposable loss ====================================
 
@@ -144,9 +159,6 @@ class nondecomposableloss:
         l = numpy.inf
         t = 1
         deltal = -numpy.inf
-        Ip = numpy.where(y==+1)[0]
-        In = numpy.where(y==-1)[0]
-        nrY = len(Ip)
 
         # iterate over training epochs:
         while ((t<T) & (deltal<-1e-7)):
@@ -301,12 +313,10 @@ def loss_aucpr(prec,surrogateL,f,x,y,alpha):
 
     # compute the loss over the different biases
     l = 0;
-    smalll=0;
     dldw = numpy.zeros(f.w.shape);
     dalphadw = numpy.zeros((K,1));
     for t in range(0,K):
         # prediction
-        out = f(x,t)
         pred,dfdw = f(x,t)
         lh,dlhdf = surrogateL(pred,y)
         # weighted loss
@@ -346,14 +356,12 @@ def plotroc(FNr,FPr=None):
     plt.ylabel('True positive rate')
 
 def prc(pred,y,targetlab=1,targetid=0):
-    N = len(y)
     Ntarget = numpy.sum(y==targetlab)
     lab = (y==targetlab)*1.  # ugly to convert logical->float
 
     # sort predictions:
     pred = -pred
     ind = pred[:,targetid].argsort()
-    spred = numpy.sort(pred[:,targetid])
     labt = lab[ind]
     labo = 1.-labt
 
