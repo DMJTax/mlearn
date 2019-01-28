@@ -1,0 +1,29 @@
+import numpy 
+from mlearn import *
+from prtools import *
+import matplotlib.pyplot as plt
+
+# create some dataset
+N = [50,50]
+x0 = numpy.random.randn(N[0],2)
+x1 = numpy.random.randn(N[1],2)
+x1[:,0] = x1[:,0] + 3.  # move data from class 1
+x = numpy.concatenate((x0,x1),axis=0)
+y = numpy.concatenate((-numpy.ones([N[0],1]),numpy.ones([N[1],1])),axis=0)
+
+# define a model
+f = mlmodel(model_linear,2)
+# define loss
+L = decomposableloss(loss_hinge,reg_l2,0.01)
+# optimise:
+f,l = L.train_gd(f,x,y,learnrate=0.001,T=100)
+
+# how good is it?
+pred,der = f(x)
+print("The classification error is %f."%numpy.mean(loss_01(pred,y)))
+
+# show
+plt.scatter(x[:,0],x[:,1],c=y.flatten())
+f.plot()
+plt.show()
+
