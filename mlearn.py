@@ -207,6 +207,12 @@ def loss_squared(fx,y):
     dldf = 2*dff
     return (l,dldf)
 
+def loss_l1(fx,y):
+    dff = fx-y
+    l = numpy.abs(dff)
+    dldf = numpy.sign(dff)
+    return (l,dldf)
+
 # --- asymmetric ones ---
 
 def loss_exp_sigm(fx,y):
@@ -372,6 +378,26 @@ def prc(pred,y,targetlab=1,targetid=0):
     rec = clabt/Ntarget
 
     return prec,rec
+
+# === plotting loss ======================================
+def plotloss2D(loss,f,wi,wj,x,y,nrlevels=10,colors=None,gridsize = 30):
+    dwi = (wi[2]-wi[1])/(gridsize-1)
+    dwj = (wj[2]-wj[1])/(gridsize-1)
+    wis = numpy.arange(wi[1],wi[2]+0.01*dwi,dwi)
+    wjs = numpy.arange(wj[1],wj[2]+0.01*dwj,dwj)
+    z = numpy.zeros((gridsize,gridsize))
+    weights = f.w
+    for i in range(0,gridsize):
+        for j in range(0,gridsize):
+            f.w[wi[0]] = wis[i]
+            f.w[wj[0]] = wjs[j]
+            fx,_ = f(x)
+            z[j,i] = numpy.mean(loss(fx,y)) # average over all data
+    levels = numpy.linspace(numpy.min(z),numpy.max(z),nrlevels)
+    plt.contour(wis,wjs,z,levels,colors=colors)
+    plt.xlabel('w_%d'%wi[0])
+    plt.ylabel('w_%d'%wj[0])
+
 
 # === simple models ======================================
 
