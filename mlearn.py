@@ -34,6 +34,9 @@ class mlmodel(object):
         f,df = self.modelfunc(self.w,x,args)
         return f,df
 
+    def __len__(self):
+        return len(self.w)
+
     def gradientcheck(self,x):
         "Gradient checking of the function. If the test fails, output is false"
         # claimed exact outcome and gradient:
@@ -105,7 +108,7 @@ class decomposableloss:
 
         return (l,dldw)
 
-    def train_gd(self,f,x,y,learnrate=0.0001,T=100):
+    def train_gd(self,f,x,y,learnrate=0.0001,T=1000):
         f = copy.deepcopy(f)
         loss = numpy.zeros(T)
         t = 0
@@ -113,6 +116,31 @@ class decomposableloss:
         while (t<T) and (deltal<1e-7):
             (loss[t],dldw) = self(f,x,y)
             f.w = f.w -learnrate*dldw
+
+            if (numpy.remainder(t,100)==0):
+                print('Epoch %d: loss=%f' % (t,loss[t]))
+            if (t>0):
+                deltal = loss[t]-loss[t-1]
+            t += 1
+           
+        return (f,loss)
+
+    def train_adam(self,f,x,y,learnrate=0.001,T=10000,beta1=0.9,beta2=0.999):
+        f = copy.deepcopy(f)
+        n = len(f)
+        loss = numpy.zeros(T)
+        eps = 1e-8
+        t = 0
+        m = numpy.zeros((n,1))
+        v = numpy.zeros((n,1))
+        deltal = -numpy.inf
+        while (t<T) and (deltal<1e-7):
+            (loss[t],dldw) = self(f,x,y)
+            m = beta1*m + (1.-beta1)*dldw
+            v = beta2*v + (1.-beta2)*dldw*dldw
+            m = m/(1.-beta1**(t+1))
+            v = v/(1.-beta2**(t+1))
+            f.w = f.w -learnrate*m/(numpy.sqrt(v) + eps)
 
             if (numpy.remainder(t,100)==0):
                 print('Epoch %d: loss=%f' % (t,loss[t]))
