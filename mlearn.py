@@ -1,3 +1,6 @@
+"""
+Machine Learning toolbox
+"""
 import numpy
 import matplotlib.pyplot as plt
 import copy  # tsk tsk, this python
@@ -5,7 +8,15 @@ import copy  # tsk tsk, this python
 # === ML model =============================================
 
 class mlmodel(object):
-    'General prediction model given some input feature vector'
+    """General ML prediction model
+
+    Defines a model that contains:
+    .name  the model name
+    .dim   the input dimensionality for the data
+    .w     the model parameters
+    .pred  the output (plus gradient, if required)
+
+    """
 
     def __init__(self):
         self.name = ''
@@ -70,8 +81,18 @@ class mlmodel(object):
 
 # === decomposable loss ====================================
 
-class decomposableloss:
-    "Loss function like   sum_i loss(fx_i,y_i) + lambda * Regularizer"
+class decomposableloss(object):
+    """Loss function class
+
+    Encapsulate an optimisation problem like:
+           L = sum_i loss(fx_i,y_i)  +  lambda * Regularizer"
+    in an object.
+
+    Input arguments:
+    loss    loss function
+    reg     regularizer
+    l       tradeoff parameter lambda
+    """
 
     def __init__(self,loss,reg,l):
         if not callable(loss):
@@ -229,7 +250,7 @@ class nondecomposableloss:
         return f,l
 
     
-# === simple definitions ======================================
+# === loss definitions ======================================
 
 def loss_01(fx,y):
     l = (numpy.sign(fx) != y)*1  # ugly way to convert logical->int
@@ -270,7 +291,7 @@ def loss_ownloss(fx,y):
     dldf = (p*dff**(p-1))*sg
     return (l,dldf)
 
-# --- asymmetric ones ---
+# --- asymmetric loss functions ---
 
 def loss_exp_sigm(fx,y):
     A = 1.
@@ -290,7 +311,7 @@ def loss_exp_sigm(fx,y):
 
     return (l,dldf)
 
-# --- complicated ones ---
+# --- complicated loss functions ---
 
 def loss_auc(fx,y,bnd=None):
     if bnd is None:
@@ -311,16 +332,6 @@ def loss_prc(fx,y):
 
     out = numpy.trapz(prec,rec)
     return out
-
-def reg_l1(w):
-    r = sum(abs(w))
-    drdw = numpy.sign(w)
-    return (r,drdw)
-
-def reg_l2(w):
-    r = w.transpose().dot(w)  # this is ridiculous!
-    drdw = 2*w
-    return (r,drdw)
 
 def loss_RatP(prec,surrogateL,f,x,y,alpha):
     Ip = numpy.where(y==+1)[0]
@@ -436,6 +447,19 @@ def prc(pred,y,targetlab=1,targetid=0):
 
     return prec,rec
 
+ 
+# --- standard regularizers ----------------------------
+
+def reg_l1(w):
+    r = sum(abs(w))
+    drdw = numpy.sign(w)
+    return (r,drdw)
+
+def reg_l2(w):
+    r = w.transpose().dot(w)  # this is ridiculous!
+    drdw = 2*w
+    return (r,drdw)
+
 # === plotting loss ======================================
 def plotloss2D(loss,f,wi,wj,x,y,nrlevels=10,colors=None,gridsize = 30):
     dwi = (wi[2]-wi[1])/(gridsize-1)
@@ -536,6 +560,8 @@ class model_linear_multib(mlmodel):
             return f,dfdw
         else:
             return f
+
+# some standard classifiers:
 
 def ols(f,X,y,lambda1=0.):
     n = X.shape[0]
