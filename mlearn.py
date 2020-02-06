@@ -91,7 +91,7 @@ class decomposableloss:
 
     def __call__(self,f,x,y):
         #prediction
-        (pred,dfdw) = f(x)
+        (pred,dfdw) = f(x,give_grad=True)
         # losses:
         (l,dldf) = self.dataloss(pred,y)
         (r,drdw) = self.regularizer(f.w)
