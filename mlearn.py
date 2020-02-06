@@ -563,7 +563,8 @@ class model_linear_multib(mlmodel):
 
 # some standard classifiers:
 
-def ols(f,X,y,lambda1=0.):
+def ols(X,y,lambda1=0.):
+    " Ordinary least-squares "
     n = X.shape[0]
     X = numpy.concatenate((X,numpy.ones((n,1))),axis=1)
     dim = X.shape[1]
@@ -572,6 +573,14 @@ def ols(f,X,y,lambda1=0.):
     tmp = Cinv.dot(X.T)
     f = model_linear(dim=dim)
     f.w = tmp.dot(y)
+    return f
+
+def logistic(X,y,lambda1=0.):
+    " Logistic classifier "
+    N,dim = X.shape
+    f = model_linear(dim=dim)
+    L = decomposableloss(ml.loss_logistic,ml.reg_l2,lambda1)
+    f,l = L.train_gd(f,X,y,learnrate=0.0001,T=100)
     return f
 
 
