@@ -7,32 +7,27 @@ import copy  # tsk tsk, this python
 class mlmodel(object):
     'General prediction model given some input feature vector'
 
-    def __init__(self,modelfunc,dim,*args):
-        if not callable(modelfunc):
-            raise ValueError('The modelfunction should be a function.')
-        if not isinstance(dim,int):
-            raise ValueError('The dimensionality should be an integer.')
+    def __init__(self):
         self.name = ''
-        self.modelfunc = modelfunc
-        self.dim = dim
-        (self.w,self.name) = modelfunc('init',dim,args)
+        self.pred = None
+        self.dim = 0
+        self.w = None
 
     def __str__(self):
         return "%s model with %dD input." % (self.name,self.dim)
 
-    def w(self):
-        print(self.w)
-
-    def __call__(self,x,*args):
-        # keep on torturing the data until it becomes a numpy array of
-        # the right size:
-        # (did I ever told you that I hate python?)
-        if not isinstance(x,numpy.ndarray):
-            x = numpy.array(+x)
-        if (len(x.shape)==1):
-            x = numpy.array(x,ndmin=2)
-        f,df = self.modelfunc(self.w,x,args)
-        return f,df
+    def __call__(self,x,give_grad=False):
+        if self.pred is None:
+            return None # or raise an error??
+        else:
+            # keep on torturing the data until it becomes a numpy array of
+            # the right size:
+            # (did I ever told you that I hate python?)
+            if not isinstance(x,numpy.ndarray):
+                x = numpy.array(+x)
+            if (len(x.shape)==1):
+                x = numpy.array(x,ndmin=2)
+            return self.pred(x,give_grad)
 
     def __len__(self):
         return len(self.w)
@@ -40,17 +35,17 @@ class mlmodel(object):
     def gradientcheck(self,x):
         "Gradient checking of the function. If the test fails, output is false"
         # claimed exact outcome and gradient:
-        [pred,grad] = self.modelfunc(self.w,x)
+        [pred,grad] = self.pred(x,give_grad=True)
         # the original weights:
-        W = self.w
+        W = numpy.copy(self.w)
         # now approximate
         smallval = 1e-8
         approx = numpy.zeros(grad.shape)
         for i in range(0, len(W)):
-            w1 = numpy.copy(W); w1[i]+=smallval  # WTF! explicit copy!!
-            f1 = self.modelfunc(w1,x)[0]
-            w2 = numpy.copy(W); w2[i]-=smallval
-            f2 = self.modelfunc(w2,x)[0]
+            self.w = W + smallval
+            f1 = self.pred(x)
+            self.w = W - smallval
+            f2 = self.pred(x)
             df = f1-f2
             approx[:,i] = df[:,0]/(2*smallval)
         err = abs(grad - approx)
@@ -70,7 +65,7 @@ class mlmodel(object):
             for j in range(0,gridsize):
                 # have I already told you that I hate python?
                 featvec = numpy.array([x[i],y[j]],ndmin=2)
-                z[j,i] = self(featvec)[0]
+                z[j,i] = self(featvec)
         plt.contour(x,y,z,levels,colors=colors)
 
 # === decomposable loss ====================================
@@ -140,6 +135,31 @@ class decomposableloss:
             v = beta2*v + (1.-beta2)*dldw*dldw
             m = m/(1.-beta1**(t+1))
             v = v/(1.-beta2**(t+1))
+            f.w = f.w -learnrate*m/(numpy.sqrt(v) + eps)
+
+            if (numpy.remainder(t,100)==0):
+                print('Epoch %d: loss=%f' % (t,loss[t]))
+            if (t>0):
+                deltal = loss[t]-loss[t-1]
+            t += 1
+           
+        return (f,loss)
+            
+    def train_adam2(self,f,x,y,learnrate=0.001,T=10000,beta1=0.9,beta2=0.999):
+        f = copy.deepcopy(f)
+        loss = numpy.zeros(T)
+        eps = 1e-8
+        (loss[0],dldw) = self(f,x,y)
+        m = dldw
+        v = dldw*dldw
+        t = 1
+        deltal = -numpy.inf
+        while (t<T) and (deltal<1e-7):
+            (loss[t],dldw) = self(f,x,y)
+            m = beta1*m + (1.-beta1)*dldw
+            v = beta2*v + (1.-beta2)*dldw*dldw
+            m = m/(1.-beta1**t)
+            v = v/(1.-beta2**t)
             f.w = f.w -learnrate*m/(numpy.sqrt(v) + eps)
 
             if (numpy.remainder(t,100)==0):
@@ -239,6 +259,15 @@ def loss_l1(fx,y):
     dff = fx-y
     l = numpy.abs(dff)
     dldf = numpy.sign(dff)
+    return (l,dldf)
+
+# weirdo one:
+def loss_ownloss(fx,y):
+    p = 6
+    dff = numpy.abs(fx - y)
+    sg = numpy.sign(fx - y)
+    l = dff**p
+    dldf = (p*dff**(p-1))*sg
     return (l,dldf)
 
 # --- asymmetric ones ---
@@ -427,55 +456,97 @@ def plotloss2D(loss,f,wi,wj,x,y,nrlevels=10,colors=None,gridsize = 30):
     plt.ylabel('w_%d'%wj[0])
 
 
+#  = interface to prtools...
+def m2p(f,*args):
+    "ML to PRtools mapping"
+    if isinstance(f,str):
+        if (f=='untrained'):
+            return 'M2P '
+    if isinstance(f,mlearn.mlmodel):
+        # store the model in a prmapping:
+        newm = prmapping(m2p)
+        newm.data = (f,args) # a bit ugly, but needed
+        newm.name += f.name
+        newm.shape[0] = f.dim
+        newm.shape[1] = 1
+        newm.mapping_type = 'trained'
+        return newm
+    else:
+        # we are applying to new data, stored in args[0]
+        if isinstance(f[0],mlearn.mlmodel):
+            functionargs = f[1]
+            out = f[0](args[0],*functionargs)  # bloody Python magic
+        else:
+            print("we did not get a ml model!!")
+
+        return out[0]
+
+
 # === simple models ======================================
 
-def model_linear(w,x,s=None):
+class model_linear(mlmodel):
    "Linear model"
-   
-   if isinstance(w,basestring):
-       # Define the initialisation:
-       if s is None:
-           s=0.0001
-       if (len(s)==0):
-           s=0.0001
-       w = s*numpy.random.randn(x+1,1)
-       return (w,"Linear")     # parameters and name
-   else:
-       # Function output and derivative wrt. weights
-       sz = x.shape
-       x1 = numpy.concatenate((x,numpy.ones((sz[0],1))),axis=1)
-       return (x1.dot(w), x1)  # model output and derivative
-        
-def model_linear_nob(w,x,s):
-   "Linear model without bias term"
-   if isinstance(w,basestring):
-       # First define the initialisation:
-       if (len(s)<1):
-           s=0.0001
-       w = s*numpy.random.randn(x,1)
-       return (w,"Nonbias linear")
-   else:
-       # Next define the function output and derivative wrt. weights
-       return (x.dot(w), x)
 
-def model_linear_multib(w,x,k=5):
+   def __init__(self,dim=2,sigm=0.0001):
+       self.name = 'Linear'
+       self.dim = dim
+       self.w = sigm*numpy.random.randn(dim+1,1)
+   
+   def pred(self,x,give_grad=False):
+       # Function output and derivative wrt. weights
+       N = x.shape[0]
+       xx = numpy.concatenate((x,numpy.ones((N,1))),axis=1)
+       if give_grad:
+           return (xx.dot(self.w), xx)
+       else:
+           return xx.dot(self.w)
+        
+class model_linear_nobias(mlmodel):
+   "Linear model without bias"
+
+   def __init__(self,dim=2,sigm=0.001):
+       self.name = 'Non-biased linear'
+       self.dim = dim
+       self.w = sigm*numpy.random.randn(dim,1)
+   
+   def pred(self,x,give_grad=False):
+       # Function output and derivative wrt. weights
+       if give_grad:
+           return (x.dot(self.w), x)
+       else:
+           return x.dot(self.w)
+
+class model_linear_multib(mlmodel):
     "Linear model with multiple biases"
-    if isinstance(w,basestring):
-        if (len(k)<2):
-            s = 0.0001
-        else:
-            s = k[1]
-        w1 = s*numpy.random.randn(x,1)
-        w2 = numpy.linspace(-2*s, 2*s, k[0])
-        w = numpy.vstack((w1,w2[:,None]))  # WTF! I hate python!
-        return (w,"Linear multibias")
-    else:
+
+    def __init__(self,dim=2,k=5,sigm=0.001):
+        self.name = 'Multiple-bias linear'
+        self.dim = dim
+        w1 = sigm*numpy.random.randn(dim,1)
+        w2 = numpy.linspace(-2*sigm, 2*sigm, k)
+        self.w = numpy.vstack((w1,w2[:,None]))  # WTF! I hate python!
+
+    def pred(self,x,give_grad=False):
         sz = x.shape
-        nr = len(w)-sz[1]
+        nr = len(self.w)-sz[1]
         f = x.dot(w[0:sz[1]]) + w[sz[1]+k[0]]
-        dfdw = numpy.concatenate((x,numpy.zeros((sz[0],nr))),axis=1)
-        dfdw[:,sz[1]+k[0]] = 1
-        return f,dfdw
+        if give_grad:
+            dfdw = numpy.concatenate((x,numpy.zeros((sz[0],nr))),axis=1)
+            dfdw[:,sz[1]+k[0]] = 1
+            return f,dfdw
+        else:
+            return f
+
+def ols(f,X,y,lambda1=0.):
+    n = X.shape[0]
+    X = numpy.concatenate((X,numpy.ones((n,1))),axis=1)
+    dim = X.shape[1]
+    C = numpy.matmul(X.T,X) + lambda1*numpy.eye(dim)
+    Cinv = numpy.linalg.inv(C)
+    tmp = Cinv.dot(X.T)
+    f = model_linear(dim=dim)
+    f.w = tmp.dot(y)
+    return f
 
 
 
