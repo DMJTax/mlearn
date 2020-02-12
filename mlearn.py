@@ -69,6 +69,17 @@ class mlmodel(object):
         return (err.max()<1e-8)
 
     def plot(self,levels=[0.0],colors=None,gridsize = 30):
+        """
+        Plot
+
+        Plot the contour line at level 0: f(x)=0.
+
+        Input:
+        levels       the levels of contour (default: level=0)
+        colors       color of the lines 
+        gridsize     resolution of the grid where output is computed
+                     (default: gridsize=30)
+        """
         ax = plt.gca()
         if colors is None:
             colors = next(ax._get_lines.prop_cycler)['color']
@@ -634,7 +645,14 @@ class model_linear_multib(mlmodel):
 # some standard classifiers:
 
 def ols(X,y,lambda1=0.):
-    " Ordinary least-squares "
+    """
+    Ordinary least-squares
+
+    Input:
+    X          data matrix of size  #objs x #features
+    y          label vector of size #objs x 1
+    lambda1    regularization parameter
+    """
     n = X.shape[0]
     X = numpy.concatenate((X,numpy.ones((n,1))),axis=1)
     dim = X.shape[1]
@@ -646,7 +664,14 @@ def ols(X,y,lambda1=0.):
     return f
 
 def logistic(X,y,lambda1=0.):
-    " Logistic classifier "
+    """
+    Logistic classifier
+
+    Input:
+    X          data matrix of size  #objs x #features
+    y          label vector of size #objs x 1
+    lambda1    regularization parameter
+    """
     N,dim = X.shape
     f = model_linear(dim=dim)
     L = decomposableloss(loss_logistic,reg_l2_ignorebias,lambda1)
