@@ -70,6 +70,8 @@ class mlmodel(object):
 
     def plot(self,levels=[0.0],colors=None,gridsize = 30):
         ax = plt.gca()
+        if colors is None:
+            colors = next(ax._get_lines.prop_cycler)['color']
         xl = ax.get_xlim()
         yl = ax.get_ylim()
         dx = (xl[1]-xl[0])/(gridsize-1)
@@ -485,16 +487,27 @@ def prc(pred,y,targetlab=1,targetid=0):
  
 # --- standard regularizers ----------------------------
 
-def reg_l1(w,I=None):
+def reg_l1(w):
     r = sum(abs(w))
     drdw = numpy.sign(w)
     return (r,drdw)
 
-def reg_l2(w,I=None):
-    if I is not None:
-        w = w[I]
+def reg_l2(w):
     r = w.transpose().dot(w)  # this is ridiculous!
     drdw = 2*w
+    return (r,drdw)
+
+def reg_l1_ignorebias(w):
+    r = sum(abs(w[1:]))
+    drdw = numpy.sign(w)
+    drdw[0] = 0
+    return (r,drdw)
+
+def reg_l2_ignorebias(w):
+    ww = w[1:]
+    r = ww.transpose().dot(ww)  # this is ridiculous!
+    drdw = 2*w
+    drdw[0] = 0
     return (r,drdw)
 
 # === plotting loss ======================================
@@ -546,24 +559,44 @@ def m2p(f,*args):
 # === simple models ======================================
 
 class model_linear(mlmodel):
-   "Linear model"
+   """
+   Linear model
+
+   Define a linear model in D dimensions:
+      f(x) = w_0 + w^T x
+   The weights w are initialised with Gaussian white noise.
+
+   Input:
+   dim     input dimensionality
+   sigm    standard deviation of the Gaussian noise
+   """
 
    def __init__(self,dim=2,sigm=0.0001):
        self.name = 'Linear'
        self.dim = dim
-       self.w = sigm*numpy.random.randn(dim+1,1)
+       self.w = sigm*numpy.random.randn(1+dim,1)
    
    def pred(self,x,give_grad=False):
        # Function output and derivative wrt. weights
        N = x.shape[0]
-       xx = numpy.concatenate((x,numpy.ones((N,1))),axis=1)
+       xx = numpy.concatenate((numpy.ones((N,1)),x),axis=1)
        if give_grad:
            return (xx.dot(self.w), xx)
        else:
            return xx.dot(self.w)
         
 class model_linear_nobias(mlmodel):
-   "Linear model without bias"
+   """
+   Linear model without bias
+
+   Define a linear model in D dimensions:
+      f(x) = w^T x
+   The weights w are initialised with Gaussian white noise.
+
+   Input:
+   dim     input dimensionality
+   sigm    standard deviation of the Gaussian noise
+   """
 
    def __init__(self,dim=2,sigm=0.001):
        self.name = 'Non-biased linear'
@@ -616,9 +649,8 @@ def logistic(X,y,lambda1=0.):
     " Logistic classifier "
     N,dim = X.shape
     f = model_linear(dim=dim)
-    I = [0:dim-1]
-    L = decomposableloss(loss_logistic,reg_l2([],I=I),lambda1)
-    f,l = L.train_gd(f,X,y,learnrate=0.0001,T=100)
+    L = decomposableloss(loss_logistic,reg_l2_ignorebias,lambda1)
+    f,l = L.train_gd(f,X,y,learnrate=0.0001,T=10000)
     return f
 
 
