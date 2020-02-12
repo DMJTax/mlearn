@@ -1,5 +1,10 @@
 """
 Machine Learning toolbox
+
+Very basic toolbox to define simple prediction functions and loss
+functions. Optimisation is done by standard gradient descent.
+This toolbox is only useful for small problems, where you want to gain
+insight.
 """
 import numpy
 import matplotlib.pyplot as plt
@@ -105,9 +110,9 @@ class decomposableloss(object):
         self.lambd = l
 
     def __str__(self):
-        outstr = "Decomp.loss: "+self.dataloss.func_name
+        outstr = "Decomp.loss"+self.dataloss.__name__
         if (self.lambd>0):
-            outstr+=" + %f %s" % (self.lambd,self.regularizer.func_name)
+            outstr+=" + %f %s" % (self.lambd,self.regularizer.__name__)
         return outstr
 
     def __call__(self,f,x,y):
@@ -125,6 +130,20 @@ class decomposableloss(object):
         return (l,dldw)
 
     def train_gd(self,f,x,y,learnrate=0.0001,T=1000):
+        """
+        Train a model on data (x,y) using gradient descent.
+
+        Input:
+        f          mlmodel for which the params have to be optimised
+        x          data matrix of size  #objs x #features
+        y          label vector of size #objs x 1
+        learnrate  learning rate
+        T          maximum number of iterations
+
+        Output:
+        f          mlmodel with optimised weights
+        loss       obtained loss
+        """
         f = copy.deepcopy(f)
         loss = numpy.zeros(T)
         t = 0
@@ -142,6 +161,22 @@ class decomposableloss(object):
         return (f,loss)
 
     def train_adam(self,f,x,y,learnrate=0.001,T=10000,beta1=0.9,beta2=0.999):
+        """
+        Train a model on data (x,y) using ADAM.
+
+        Input:
+        f          mlmodel for which the params have to be optimised
+        x          data matrix of size  #objs x #features
+        y          label vector of size #objs x 1
+        learnrate  learning rate
+        T          maximum number of iterations
+        beta1      decay rate for first moment estimates
+        beta2      decay rate for second moment estimates
+
+        Output:
+        f          mlmodel with optimised weights
+        loss       obtained loss
+        """
         f = copy.deepcopy(f)
         n = len(f)
         loss = numpy.zeros(T)
@@ -450,12 +485,14 @@ def prc(pred,y,targetlab=1,targetid=0):
  
 # --- standard regularizers ----------------------------
 
-def reg_l1(w):
+def reg_l1(w,I=None):
     r = sum(abs(w))
     drdw = numpy.sign(w)
     return (r,drdw)
 
-def reg_l2(w):
+def reg_l2(w,I=None):
+    if I is not None:
+        w = w[I]
     r = w.transpose().dot(w)  # this is ridiculous!
     drdw = 2*w
     return (r,drdw)
@@ -579,7 +616,8 @@ def logistic(X,y,lambda1=0.):
     " Logistic classifier "
     N,dim = X.shape
     f = model_linear(dim=dim)
-    L = decomposableloss(ml.loss_logistic,ml.reg_l2,lambda1)
+    I = [0:dim-1]
+    L = decomposableloss(loss_logistic,reg_l2([],I=I),lambda1)
     f,l = L.train_gd(f,X,y,learnrate=0.0001,T=100)
     return f
 
