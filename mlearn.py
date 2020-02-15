@@ -19,7 +19,7 @@ class mlmodel(object):
     .name  the model name
     .dim   the input dimensionality for the data
     .w     the model parameters
-    .pred  the output (plus gradient, if required)
+    .pred  the prediction function (plus gradient, if required)
 
     """
 
@@ -33,6 +33,17 @@ class mlmodel(object):
         return "%s model with %dD input." % (self.name,self.dim)
 
     def __call__(self,x,give_grad=False):
+        """
+        Compute the output of the function, and the gradient, if
+        required.
+
+        Input:
+        X          dataset
+        give_grad  boolean indicating if gradient is required
+
+        Output:
+        f          output of the function
+        """
         if self.pred is None:
             return None # or raise an error??
         else:
